@@ -3,32 +3,43 @@ export type Product = {
   name: string;
   hindi: string;
   price: number;
-  unit: "kg" | "pkt" | "L";
+  unit: string;
   loose: boolean;
   aliases: string[];
+  barcode: string | null;
+  image: string | null;
 };
 
-export const PRODUCTS: Product[] = [
-  { id: "toor", name: "Toor Dal", hindi: "तूर दाल", price: 120, unit: "kg", loose: true, aliases: ["arhar", "tur", "toor"] },
-  { id: "chana", name: "Chana Dal", hindi: "चना दाल", price: 90, unit: "kg", loose: true, aliases: ["chana", "channa"] },
-  { id: "besan", name: "Besan", hindi: "बेसन", price: 80, unit: "kg", loose: true, aliases: ["gram flour", "besan"] },
-  { id: "sugar", name: "Sugar", hindi: "चीनी", price: 48, unit: "kg", loose: true, aliases: ["chini", "cheeni", "cheni", "shakar", "shakkar"] },
-  { id: "rice", name: "Rice", hindi: "चावल", price: 55, unit: "kg", loose: true, aliases: ["chawal", "chaval"] },
-  { id: "atta", name: "Atta", hindi: "आटा", price: 48, unit: "kg", loose: true, aliases: ["aata", "wheat flour", "gehu"] },
-  { id: "potato", name: "Potato", hindi: "आलू", price: 35, unit: "kg", loose: true, aliases: ["aloo", "alu"] },
-  { id: "onion", name: "Onion", hindi: "प्याज़", price: 40, unit: "kg", loose: true, aliases: ["pyaz", "pyaaz", "kanda"] },
-  { id: "pumpkin", name: "Pumpkin", hindi: "कद्दू", price: 40, unit: "kg", loose: true, aliases: ["kaddu", "sitaphal"] },
-  { id: "parleg", name: "Parle-G", hindi: "पारले-जी", price: 5, unit: "pkt", loose: false, aliases: ["parle", "biscuit"] },
-  { id: "milk", name: "Amul Milk", hindi: "अमूल दूध", price: 30, unit: "pkt", loose: false, aliases: ["doodh", "dudh", "amul"] },
-  { id: "salt", name: "Tata Salt", hindi: "नमक", price: 28, unit: "pkt", loose: false, aliases: ["namak", "tata"] },
-  { id: "maggi", name: "Maggi", hindi: "मैगी", price: 14, unit: "pkt", loose: false, aliases: ["noodles", "magi"] },
-  { id: "sunoil", name: "Fortune Sunflower Oil", hindi: "सूरजमुखी तेल", price: 150, unit: "L", loose: false, aliases: ["sunflower", "fortune", "tel"] },
-  { id: "mustard", name: "Mustard Oil", hindi: "सरसों तेल", price: 170, unit: "L", loose: false, aliases: ["sarson", "mustard", "tel"] },
-  { id: "soyoil", name: "Soybean Oil", hindi: "सोयाबीन तेल", price: 140, unit: "L", loose: false, aliases: ["soya", "soybean", "tel"] },
-  { id: "groundnut", name: "Groundnut Oil", hindi: "मूंगफली तेल", price: 190, unit: "L", loose: false, aliases: ["moongfali", "peanut", "tel"] },
-];
+import { supabase } from "@/integrations/supabase/client";
 
-export const byId = (id: string) => PRODUCTS.find((p) => p.id === id)!;
+let CATALOG: Product[] = [];
+export const getCatalog = () => CATALOG;
+
+export async function loadProducts(): Promise<Product[]> {
+  const { data, error } = await supabase
+    .from("products")
+    .select("id,name,hindi_name,aliases,barcode,price,unit,product_type,image")
+    .eq("is_active", true)
+    .order("name");
+  if (error) throw error;
+  CATALOG = (data ?? []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    hindi: r.hindi_name,
+    aliases: r.aliases,
+    barcode: r.barcode,
+    price: Number(r.price),
+    unit: r.unit as Product["unit"],
+    loose: r.product_type === "loose",
+    image: r.image,
+  }));
+  return CATALOG;
+}
+
+export const byBarcode = (code: string) => CATALOG.find((p) => p.barcode === code);
+
+const MISSING: Product = { id: "?", name: "Unknown", hindi: "", price: 0, unit: "pkt", loose: false, aliases: [], barcode: null, image: null };
+export const byId = (id: string) => CATALOG.find((p) => p.id === id) ?? MISSING;
 
 function lev(a: string, b: string) {
   const w = b.length + 1;
@@ -45,7 +56,7 @@ function lev(a: string, b: string) {
 export function fuzzySearch(q: string) {
   const s = q.trim().toLowerCase();
   if (!s) return [];
-  return PRODUCTS.map((p) => {
+  return CATALOG.map((p) => {
     const terms = [p.name.toLowerCase(), ...p.aliases];
     let best = 99;
     let hit = "";
