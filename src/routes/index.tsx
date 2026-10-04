@@ -467,7 +467,7 @@ function BillCard({ lines, total, onRemove, onOpen }: { lines: Line[]; total: nu
     <div className="rounded-xl bg-card p-4 ring-1 ring-border">
       <button className="flex w-full items-center" onClick={onOpen}>
         <span className="text-xs font-bold tracking-widest text-muted-foreground uppercase">Current Bill</span>
-        <span className="ml-auto text-xs font-bold text-brand">{lines.length} items · View</span>
+        <span className="ml-auto text-xs font-bold text-brand">{lines.length} {lines.length === 1 ? "item" : "items"} · View</span>
       </button>
       {lines.length === 0 ? (
         <p className="py-5 text-center text-muted-foreground">No items yet. Point camera at a product.</p>
