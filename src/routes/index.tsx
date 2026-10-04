@@ -39,6 +39,8 @@ type Sheet =
   | null
   | { k: "suggest" }
   | { k: "unknown" }
+  | { k: "confirm"; id: string; conf: number }
+  | { k: "changeProduct" }
   | { k: "search" }
   | { k: "qty"; id: string }
   | { k: "barcode" }
@@ -110,7 +112,7 @@ function App() {
   const onAdd = () => {
     if (det.mode === "suggest") return setSheet({ k: "suggest" });
     if (det.mode === "unknown") return setSheet({ k: "unknown" });
-    setSheet({ k: "qty", id: det.id });
+    setSheet({ k: "confirm", id: det.id, conf: det.conf });
   };
 
   const finishBill = (status: "Paid" | "Udhaar", who?: string) => {
@@ -211,7 +213,7 @@ function App() {
             <div className="px-4 pt-3">
               <div className="grid grid-cols-2 gap-3">
                 <button className={`${primary} py-4 text-lg`} onClick={onAdd}>+ ADD TO BILL</button>
-                <button className={`${ghost} py-4 text-lg`} onClick={() => (det.mode === "sure" && det.id === "soyoil" ? setSheet({ k: "correct", uid: -1 }) : setSheet({ k: "suggest" }))}>CHANGE</button>
+                <button className={`${ghost} py-4 text-lg`} onClick={() => (det.mode === "sure" && det.id === "soyoil" ? setSheet({ k: "correct", uid: -1 }) : det.mode === "suggest" ? setSheet({ k: "suggest" }) : setSheet({ k: "changeProduct" }))}>CHANGE</button>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <button className={`${ghost} flex items-center justify-center gap-2 py-3.5`} onClick={() => setSheet({ k: "barcode" })}><Barcode className="size-5" /> Scan Barcode</button>
@@ -322,34 +324,41 @@ function App() {
             </>
           )}
 
-          {sheet.k === "unknown" && (
-            <>
-              <SheetTitle sub="Choose the product manually">Product not recognized</SheetTitle>
-              <div className="grid grid-cols-2 gap-3">
-                {QUICK.map((id) => {
-                  const p = byId(id);
-                  return (
-                    <button key={id} className={`${ghost} px-3 py-4 text-left`} onClick={() => setSheet({ k: "qty", id })}>
-                      <p className="text-lg">{p.name}</p>
-                      <p className="text-sm font-medium text-muted-foreground">{p.hindi} · {rupee(p.price)}/{p.unit}</p>
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-3">
-                <button className={`${ghost} flex items-center justify-center gap-2 py-4`} onClick={() => setSheet({ k: "search" })}><Search className="size-5" /> Search</button>
-                <button className={`${ghost} flex items-center justify-center gap-2 py-4`} onClick={() => setSheet({ k: "barcode" })}><Barcode className="size-5" /> Barcode</button>
-              </div>
-            </>
-          )}
+          {sheet.k === "unknown" && <UnknownSheet onPick={(id) => setSheet({ k: "qty", id })} onSearch={() => setSheet({ k: "search" })} onBarcode={() => setSheet({ k: "barcode" })} />}
+
+          {sheet.k === "confirm" && (() => {
+            const p = byId(sheet.id);
+            return (
+              <>
+                <p className="text-xs font-bold tracking-widest text-muted-foreground uppercase">AI detected</p>
+                <div className="mt-2 flex items-center gap-4 rounded-xl bg-card p-5 ring-1 ring-border">
+                  <div className="grid size-16 place-items-center rounded-xl bg-tint text-4xl">{p.image}</div>
+                  <div className="flex-1">
+                    <p className="text-2xl font-extrabold">{p.name}</p>
+                    <p className="text-muted-foreground">{p.hindi} · {rupee(p.price)}/{p.unit}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] tracking-widest text-muted-foreground uppercase">Confidence</p>
+                    <p className={`text-3xl font-extrabold ${sheet.conf >= 85 ? "text-brand" : "text-warn"}`}>{sheet.conf}%</p>
+                  </div>
+                </div>
+                <button className={`${primary} mt-4 w-full py-5 text-xl`} onClick={() => setSheet({ k: "qty", id: p.id })}>ADD TO BILL</button>
+                <button className={`${ghost} mt-3 w-full py-5 text-xl`} onClick={() => setSheet({ k: "changeProduct" })}>CHANGE PRODUCT</button>
+              </>
+            );
+          })()}
+
+          {sheet.k === "changeProduct" && <ChangeProductSheet onPick={(id) => setSheet({ k: "qty", id })} onSearchAll={() => setSheet({ k: "search" })} />}
 
           {sheet.k === "search" && <SearchSheet onPick={(id) => setSheet({ k: "qty", id })} />}
 
           {sheet.k === "qty" && (
             <QtySheet
+              key={sheet.id}
               p={byId(sheet.id)}
               initial={sheet.id === "pumpkin" ? 1.4 : byId(sheet.id).loose ? 1 : sheet.id === "parleg" ? 2 : 1}
               onAdd={(q) => { addLine(sheet.id, q); setSheet(null); nextDetect(); }}
+              onChange={() => setSheet({ k: "changeProduct" })}
             />
           )}
 
@@ -579,13 +588,19 @@ function SearchSheet({ onPick }: { onPick: (id: string) => void }) {
   );
 }
 
-function QtySheet({ p, initial, onAdd }: { p: Product; initial: number; onAdd: (q: number) => void }) {
+function QtySheet({ p, initial, onAdd, onChange }: { p: Product; initial: number; onAdd: (q: number) => void; onChange: () => void }) {
   const [q, setQ] = useState(initial);
   const [manual, setManual] = useState(false);
   const r = (n: number) => Math.max(0, Math.round(n * 10) / 10);
   return (
     <>
-      <SheetTitle sub={`${p.hindi} · ${rupee(p.price)} / ${p.unit}`}>{p.name}</SheetTitle>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-2xl font-extrabold">{p.name}</h3>
+          <p className="text-muted-foreground">{p.hindi} · {rupee(p.price)} / {p.unit}</p>
+        </div>
+        <button onClick={onChange} className="rounded-full bg-tint px-3 py-1.5 text-sm font-bold text-brand">Change</button>
+      </div>
       <div className="rounded-xl bg-card p-5 ring-1 ring-border">
         <div className="flex items-end justify-between">
           <div>
