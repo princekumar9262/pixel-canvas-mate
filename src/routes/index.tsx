@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Barcode, Search, X, Check, ChevronLeft, Receipt, BookOpen, Settings, ScanLine, Plus, Minus, HelpCircle } from "lucide-react";
 import cameraImg from "@/assets/camera.jpg";
-import { byId, fuzzySearch, rupee, type Product } from "@/lib/kirana";
+import { byId, byBarcode, fuzzySearch, loadProducts, rupee, type Product } from "@/lib/kirana";
+import { useQuery } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -13,8 +14,23 @@ export const Route = createFileRoute("/")({
       { property: "og:description", content: "Fast camera billing and Udhaar khata for kirana shopkeepers." },
     ],
   }),
-  component: App,
+  component: Gate,
 });
+
+function Gate() {
+  const q = useQuery({ queryKey: ["products"], queryFn: loadProducts, staleTime: 5 * 60_000 });
+  if (q.isError)
+    return (
+      <Shell>
+        <div className="m-auto p-6 text-center">
+          <p className="text-lg font-bold">Could not load products</p>
+          <button className={`${primary} mt-4 px-6 py-3`} onClick={() => q.refetch()}>Try again</button>
+        </div>
+      </Shell>
+    );
+  if (!q.data) return <Shell><p className="m-auto text-muted-foreground">Loading products…</p></Shell>;
+  return <App />;
+}
 
 type Line = { uid: number; id: string; qty: number };
 type Customer = { id: string; name: string; uid: string; due: number; tx: { date: string; amt: number }[] };
@@ -337,7 +353,7 @@ function App() {
             />
           )}
 
-          {sheet.k === "barcode" && <BarcodeSheet onAdd={() => { addLine("parleg", 1); setSheet(null); }} onSearch={() => setSheet({ k: "search" })} onAI={() => setSheet(null)} />}
+          {sheet.k === "barcode" && <BarcodeSheet onAdd={(id) => { setSheet(null); setSheet({ k: "qty", id }); }} onSearch={() => setSheet({ k: "search" })} onAI={() => setSheet(null)} />}
 
           {sheet.k === "correct" && (
             <>
@@ -543,7 +559,7 @@ function SearchSheet({ onPick }: { onPick: (id: string) => void }) {
         <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} className="w-full bg-transparent px-3 py-4 text-lg font-semibold outline-none" placeholder="cheeni, sugar, shakar…" />
       </div>
       <div className="mt-2 flex flex-wrap gap-2">
-        {["cheeni", "shakar", "aloo", "tel"].map((s) => (
+        {["cheeni", "chini", "chawal", "arhar"].map((s) => (
           <button key={s} onClick={() => setQ(s)} className="rounded-full bg-tint px-3 py-1.5 text-sm font-semibold">{s}</button>
         ))}
       </div>
@@ -551,7 +567,7 @@ function SearchSheet({ onPick }: { onPick: (id: string) => void }) {
         {res.map(({ p, hit, best }) => (
           <button key={p.id} className={`${ghost} flex w-full items-center px-4 py-4 text-left`} onClick={() => onPick(p.id)}>
             <div>
-              <p className="text-lg">{p.name} / {p.hindi}</p>
+              <p className="text-lg">{p.image} {p.name} / {p.hindi}</p>
               <p className="text-sm font-medium text-muted-foreground">{best === 0 ? "Match" : "Close match"}: “{hit}”</p>
             </div>
             <span className="ml-auto">{rupee(p.price)}/{p.unit}</span>
@@ -605,9 +621,10 @@ function QtySheet({ p, initial, onAdd }: { p: Product; initial: number; onAdd: (
   );
 }
 
-function BarcodeSheet({ onAdd, onSearch, onAI }: { onAdd: () => void; onSearch: () => void; onAI: () => void }) {
-  const [found, setFound] = useState(false);
-  useEffect(() => { const t = setTimeout(() => setFound(true), 1200); return () => clearTimeout(t); }, []);
+function BarcodeSheet({ onAdd, onSearch, onAI }: { onAdd: (id: string) => void; onSearch: () => void; onAI: () => void }) {
+  const [hit, setHit] = useState<Product | null>(null);
+  const found = !!hit;
+  useEffect(() => { const t = setTimeout(() => setHit(byBarcode("8901719110016") ?? null), 1200); return () => clearTimeout(t); }, []);
   return (
     <>
       <SheetTitle>Scan Barcode</SheetTitle>
@@ -617,13 +634,13 @@ function BarcodeSheet({ onAdd, onSearch, onAI }: { onAdd: () => void; onSearch: 
       </div>
       {found ? (
         <div className="mt-4 flex items-center rounded-xl bg-card p-4 ring-1 ring-border">
-          <div><p className="text-lg font-bold">Parle-G 80g</p><p className="text-muted-foreground">Price ₹5</p></div>
+          <div><p className="text-lg font-bold">{hit?.name}</p><p className="text-sm text-muted-foreground">Barcode {hit?.barcode}</p><p className="text-muted-foreground">Price {rupee(hit?.price ?? 0)}</p></div>
           <Check className="ml-auto size-7 text-brand" />
         </div>
       ) : (
         <p className="mt-4 text-center text-muted-foreground">Hold barcode inside the box…</p>
       )}
-      <button className={`${primary} mt-4 w-full py-5 text-xl`} disabled={!found} onClick={onAdd}>ADD TO BILL</button>
+      <button className={`${primary} mt-4 w-full py-5 text-xl`} disabled={!found} onClick={() => hit && onAdd(hit.id)}>ADD TO BILL</button>
       <div className="mt-3 grid grid-cols-2 gap-3">
         <button className={`${ghost} py-3.5`} onClick={onAI}>Use AI Detection</button>
         <button className={`${ghost} py-3.5`} onClick={onSearch}>Search Product</button>
