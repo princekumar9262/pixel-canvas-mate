@@ -70,7 +70,7 @@ function App() {
   const uidRef = useRef(1);
 
   const total = lines.reduce((s, l) => s + byId(l.id).price * l.qty, 0);
-  const det = DETECT_SEQ[step % DETECT_SEQ.length];
+  const det = DETECT_SEQ[step % DETECT_SEQ.length]!;
   const detP = byId(det.id);
 
   const addLine = (id: string, qty: number) => {
@@ -83,7 +83,7 @@ function App() {
     if (!continuous) return;
     let i = 0;
     const t = setInterval(() => {
-      const id = CONT_SEQ[i];
+      const id = CONT_SEQ[i]!;
       addLine(id, 1);
       i++;
       if (i >= CONT_SEQ.length) { clearInterval(t); setContinuous(false); }

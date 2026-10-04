@@ -31,12 +31,15 @@ export const PRODUCTS: Product[] = [
 export const byId = (id: string) => PRODUCTS.find((p) => p.id === id)!;
 
 function lev(a: string, b: string) {
-  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
-  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  const w = b.length + 1;
+  const d = new Array<number>((a.length + 1) * w).fill(0);
+  const g = (i: number, j: number) => d[i * w + j] ?? 0;
+  for (let i = 0; i <= a.length; i++) d[i * w] = i;
+  for (let j = 0; j <= b.length; j++) d[j] = j;
   for (let i = 1; i <= a.length; i++)
     for (let j = 1; j <= b.length; j++)
-      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
-  return d[a.length][b.length];
+      d[i * w + j] = Math.min(g(i - 1, j) + 1, g(i, j - 1) + 1, g(i - 1, j - 1) + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return g(a.length, b.length);
 }
 
 export function fuzzySearch(q: string) {
