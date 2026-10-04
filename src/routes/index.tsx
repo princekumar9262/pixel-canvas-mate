@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Barcode, Search, X, Check, ChevronLeft, Receipt, BookOpen, Settings, ScanLine, Plus, Minus, HelpCircle } from "lucide-react";
 import cameraImg from "@/assets/camera.jpg";
-import { PRODUCTS, byId, fuzzySearch, rupee, type Product } from "@/lib/kirana";
+import { byId, fuzzySearch, rupee, type Product } from "@/lib/kirana";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -644,4 +644,3 @@ function Done({ title, sub, action, onAction, secondary }: { title: string; sub:
   );
 }
 
-export { PRODUCTS };
