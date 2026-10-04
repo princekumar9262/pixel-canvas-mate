@@ -18,7 +18,7 @@ export const Route = createFileRoute("/")({
 
 type Line = { uid: number; id: string; qty: number };
 type Customer = { id: string; name: string; uid: string; due: number; tx: { date: string; amt: number }[] };
-type Bill = { no: number; total: number; status: "Paid" | "Udhaar"; who?: string };
+type Bill = { no: number; total: number; status: "Paid" | "Udhaar"; who?: string | undefined };
 type Sheet =
   | null
   | { k: "suggest" }
